@@ -180,6 +180,8 @@ module.exports = function plot(gd, cdpie) {
                     // mapbox event binding. Or perhaps better, make a simple wrapper with the
                     // right mousedown, mousemove, and mouseup handlers just for a left/right click
                     // mapbox would use this too.
+                    //
+                    // mapbox wtf??
                     var fullLayout2 = gd._fullLayout;
                     var trace2 = gd._fullData[trace.index];
 
@@ -193,7 +195,8 @@ module.exports = function plot(gd, cdpie) {
                     .classed('surface', true)
                     .style({'pointer-events': 'all'});
 
-                sliceTop.select('path.textline').remove();
+                // TODO remove??
+                // sliceTop.select('path.textline').remove();
 
                 sliceTop
                     .on('mouseover', handleMouseOver)
@@ -210,6 +213,8 @@ module.exports = function plot(gd, cdpie) {
 
                 pt.cxFinal = cx;
                 pt.cyFinal = cy;
+
+                // TODO reuse lib/angle.js methods !!!
 
                 function arc(start, finish, cw, scale) {
                     return 'a' + (scale * cd0.r) + ',' + (scale * cd0.r) + ' 0 ' +
@@ -555,6 +560,7 @@ function transformInsideText(textBB, pt, cd0) {
     return transform;
 }
 
+// EXPORT!
 function getInscribedRadiusFraction(pt, cd0) {
     if(pt.v === cd0.vTotal && !cd0.trace.hole) return 1;// special case of 100% with no hole
 
