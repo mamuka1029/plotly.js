@@ -11,7 +11,7 @@
 var Pie = {};
 
 Pie.attributes = require('./attributes');
-Pie.supplyDefaults = require('./defaults');
+Pie.supplyDefaults = require('./defaults').supplyDefaults;
 Pie.supplyLayoutDefaults = require('./layout_defaults');
 Pie.layoutAttributes = require('./layout_attributes');
 
