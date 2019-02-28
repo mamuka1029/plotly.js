@@ -8,7 +8,6 @@
 
 'use strict';
 
-var colorAttrs = require('../../components/color/attributes');
 var plotAttrs = require('../../plots/attributes');
 var hovertemplateAttrs = require('../../components/fx/hovertemplate_attributes');
 var domainAttrs = require('../../plots/domain').attributes;
@@ -23,13 +22,19 @@ module.exports = {
         valType: 'data_array',
         editType: 'calc',
         description: [
+            'Sets the labels of each of the sunburst sectors.'
         ].join(' ')
     },
     parents: {
         valType: 'data_array',
         editType: 'calc',
         description: [
-            'If `ids` is filled, `parents` items are understood to be "ids" themselves.'
+            'Sets the parent sectors for each of the sunburst sectors.',
+            'Empty string items \'\' are understood to reference',
+            'the root node in the hierarchy.',
+            'If `ids` is filled, `parents` items are understood to be "ids" themselves.',
+            'When `ids` is not set, plotly attempts to find matching items in `labels`,',
+            'but beware there must be unique.'
         ].join(' ')
     },
 
@@ -37,7 +42,8 @@ module.exports = {
         valType: 'data_array',
         editType: 'calc',
         description: [
-            ''
+            'Sets the values associated with each of the sunburst sectors.',
+            'Use with `branchvalues` to determine how the values are summed.'
         ].join(' ')
     },
     branchvalues: {
@@ -46,7 +52,12 @@ module.exports = {
         dflt: 'extra',
         editType: 'calc',
         role: 'info',
-        description: ''
+        description: [
+            'Determines how the items in `values` are summed.',
+            'When set to *total*, items in `values` are taken to be value of all its descendants.',
+            'When set to *extra*, items in `values` corresponding to the root and the branches sectors',
+            'are taken to be the extra part not part of the sum of the values at their leaves.'
+        ].join(' ')
     },
 
     level: {
@@ -57,7 +68,8 @@ module.exports = {
         description: [
             'Sets the level from which this sunburst trace hierarchy is rendered.',
             'Set `level` to `\'\'` to start the sunburst from the root node in the hierarchy.',
-            'Must be ids if ...'
+            'Must be an "id" if `ids` is filled in, otherwise plotly attempts to find a matching',
+            'item in `labels`.'
         ].join(' ')
     },
     maxdepth: {
@@ -88,27 +100,8 @@ module.exports = {
         // },
 
         line: {
-            color: {
-                valType: 'color',
-                role: 'style',
-                dflt: colorAttrs.defaultLine,
-                arrayOk: true,
-                editType: 'style',
-                description: [
-                    'Sets the color of the line enclosing each sector.'
-                ].join(' ')
-            },
-            width: {
-                valType: 'number',
-                role: 'style',
-                min: 0,
-                dflt: 0,
-                arrayOk: true,
-                editType: 'style',
-                description: [
-                    'Sets the width (in px) of the line enclosing each sector.'
-                ].join(' ')
-            },
+            color: pieAtts.marker.line.color,
+            width: pieAtts.marker.line.width,
             editType: 'calc'
         },
         editType: 'calc'
