@@ -16,6 +16,8 @@ var pieAtts = require('../pie/attributes');
 
 var extendFlat = require('../../lib/extend').extendFlat;
 
+// TODO should we use singular `label`, `parent` and `value`?
+
 module.exports = {
     labels: {
         valType: 'data_array',
@@ -31,8 +33,6 @@ module.exports = {
         ].join(' ')
     },
 
-    // TODO or are going with `value` (singular, like for isosurface) now?
-    // TODO
     values: {
         valType: 'data_array',
         editType: 'calc',
@@ -64,7 +64,6 @@ module.exports = {
         valType: 'integer',
         editType: 'plot',
         role: 'info',
-        // TODO or maybe something like 3 or 4 would be better?
         dflt: -1,
         description: [
             'Sets the number of rendered sunburst rings from any given `level`.',
@@ -72,17 +71,9 @@ module.exports = {
         ].join(' ')
     },
 
-    // TODO?
-    // root: {
-    //     visible: {},
-    //     color: {}
-    //     // but styling could also be done via first item in arrayOk attributes?
-    // },
-
     marker: {
-        // TODO hmm not sure how this is going to work??
         colors: {
-            valType: 'data_array',  // TODO 'color_array' ?
+            valType: 'data_array',
             editType: 'calc',
             description: [
                 'Sets the color of each sector of this sunburst chart.',
@@ -96,15 +87,11 @@ module.exports = {
         //     values: ['per-branch', 'per-label', false]
         // },
 
-        // TODO special styling for leaf nodes?
-        // leafopacity: {},
-
         line: {
             color: {
                 valType: 'color',
                 role: 'style',
                 dflt: colorAttrs.defaultLine,
-                // TODO should arrayOk here mean per-root-level branch?
                 arrayOk: true,
                 editType: 'style',
                 description: [
@@ -115,7 +102,6 @@ module.exports = {
                 valType: 'number',
                 role: 'style',
                 min: 0,
-                // TODO or maybe 1 looks better?
                 dflt: 0,
                 arrayOk: true,
                 editType: 'style',
@@ -126,6 +112,27 @@ module.exports = {
             editType: 'calc'
         },
         editType: 'calc'
+    },
+
+    leaf: {
+        opacity: {
+            valType: 'number',
+            editType: 'style',
+            role: 'style',
+            min: 0,
+            max: 1,
+            dflt: 0.7,
+            description: 'Sets the opacity of the leaves.'
+        },
+        textposition: {
+            valType: 'enumerated',
+            role: 'info',
+            values: ['inside', 'outside', 'auto'],
+            dflt: 'inside',
+            editType: 'plot',
+            description: 'Specifies the location of the leaf text labels.'
+        },
+        editType: 'plot'
     },
 
     text: pieAtts.text,
@@ -141,21 +148,12 @@ module.exports = {
         keys: ['label', 'color', 'value', 'percent', 'text']
     }),
 
-    // TODO
-    // Can sunburst traces really have outside text labels? Maybe just for the
-    // outer ring?
-    textposition: pieAtts.textposition,
     insidetextfont: pieAtts.insidetextfont,
     outsidetextfont: pieAtts.outsidetextfont,
 
-    // TODO
-    // Maybe just use `name` instead?
-    // Or just use the root level?
-    title: extendFlat({}, pieAtts.title),
-
     domain: domainAttrs({name: 'sunburst', trace: true, editType: 'calc'}),
 
-    // TODO Might want the same defaults as for pie traces!!
+    // TODO Might want the same defaults as for pie traces?
     // TODO maybe drop for v1 release
     sort: pieAtts.sort,
     direction: pieAtts.direction,

@@ -28,14 +28,15 @@ function style(gd) {
 
 function styleOne(s, pt, trace) {
     var cdi = pt.data.data;
-    var ptNumber = cdi.index;
-    var line = trace.marker.line;
-    var lineColor = Lib.castOption(trace, ptNumber, 'line.color') || Color.defaultLine;
-    var lineWidth = Lib.castOption(trace, ptNumber, 'line.width') || 0;
+    var isLeaf = !pt.children;
+    var ptNumber = cdi.i;
+    var lineColor = Lib.castOption(trace, ptNumber, 'marker.line.color') || Color.defaultLine;
+    var lineWidth = Lib.castOption(trace, ptNumber, 'marker.line.width') || 0;
 
     s.style('stroke-width', lineWidth)
-        .call(Color.fill, pt.parent ? cdi.color : 'white')
-        .call(Color.stroke, lineColor);
+        .call(Color.fill, cdi.color)
+        .call(Color.stroke, lineColor)
+        .style('opacity', isLeaf ? trace.leaf.opacity : null);
 }
 
 module.exports = {

@@ -11,8 +11,8 @@
 var Lib = require('../../lib');
 var attributes = require('./attributes');
 var handleDomainDefaults = require('../../plots/domain').defaults;
-var handleTextDefaults = require('../pie/defaults').handleTextDefaults;
-var handleTitleDefaults = require('../pie/defaults').handleTitleDefaults;
+
+var coerceFont = Lib.coerceFont;
 
 module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
     function coerce(attr, dflt) {
@@ -43,8 +43,25 @@ module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout
     coerce('rotation');
 
     handleDomainDefaults(traceOut, layout, coerce);
-    handleTextDefaults(traceIn, traceOut, coerce, layout);
-    handleTitleDefaults(traceIn, traceOut, coerce, layout);
+
+    coerce('leaf.opacity');
+    coerce('leaf.textposition');
+
+    var text = coerce('text');
+    coerce('textinfo', Array.isArray(text) ? 'text+label' : 'label');
+
+    coerce('hovertext');
+    coerce('hovertemplate');
+
+    var dfltFont = coerceFont(coerce, 'textfont', layout.font);
+    var insideTextFontDefault = Lib.extendFlat({}, dfltFont);
+    var isTraceTextfontColorSet = traceIn.textfont && traceIn.textfont.color;
+    var isColorInheritedFromLayoutFont = !isTraceTextfontColorSet;
+    if(isColorInheritedFromLayoutFont) {
+        delete insideTextFontDefault.color;
+    }
+    coerceFont(coerce, 'insidetextfont', insideTextFontDefault);
+    coerceFont(coerce, 'outsidetextfont', dfltFont);
 
     // do not support transforms for now
     traceOut._length = null;

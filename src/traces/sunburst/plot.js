@@ -56,7 +56,6 @@ module.exports = function plot(gd, cdmodule) {
                 return;
             }
 
-            // TODO or slice(1) of that will trace.title in middle?
             var sliceData = partition(entry)
                 .descendants()
                 .filter(function(d) { return d.y1 <= maxDepth; });
@@ -79,6 +78,8 @@ module.exports = function plot(gd, cdmodule) {
 
             slices.each(function(pt) {
                 var sliceTop = d3.select(this);
+                var isRoot = pt.data.data.pid === '';
+                var isLeaf = !pt.children;
 
                 var slicePath = Lib.ensureSingle(sliceTop, 'path', 'surface', function(s) {
                     s.style('pointer-events', 'all');
@@ -94,40 +95,26 @@ module.exports = function plot(gd, cdmodule) {
                 pt.rInscribed = getInscribedRadiusFraction(pt, trace);
                 quadrants[pt.pxmid[1] < 0 ? 0 : 1][pt.pxmid[0] < 0 ? 0 : 1].push(pt);
 
+                // TODO format with textinfo !!!
+                pt.text = pt.data.data.label;
+
                 slicePath.attr('d', Lib.pathAnnulus(
                     y2rpx(pt.y0), y2rpx(pt.y1),
                     pt.x0, pt.x1,
                     cx, cy
                 ));
 
+                // TODO should not show hole when mulitple roots!
+
                 slicePath
                     .call(styleOne, pt, trace)
                     .call(attachHoverHandlers, gd, cd);
 
-                if(pt.children) slicePath.call(setCursor, 'pointer');
-
-                // TODO or call restyle, but would that smoothly transition?
-                slicePath.on('click', function(pt) {
-                    var clickVal = Events.triggerHandler(gd, 'plotly_sunburstclick', pt);
-                    if(clickVal === false) return;
-
-                    if(!pt.children) return;
-
-                    var fullLayoutNow = gd._fullLayout;
-                    if(gd._dragging || fullLayoutNow.hovermode === false) return;
-
-                    var id = pt.data.id;
-                    if(pt.parent) {
-                        render(findEntryWithLevel(hierarchy, id));
-                        // TODO event data
-                    } else {
-                        render(findEntryWithChild(hierarchy, id));
-                        // TODO event data
-                    }
-                });
-
-                var textPosition = pt.y1 < maxY ? 'inside' : 'auto';
-                pt.text = pt.data.data.label;
+                if(!isLeaf && !isRoot) {
+                    slicePath
+                        .call(setCursor, 'pointer')
+                        .call(attachClickHandlers, gd, cd, render);
+                }
 
                 var sliceTextGroup = Lib.ensureSingle(sliceTop, 'g', 'slicetext');
                 var sliceText = Lib.ensureSingle(sliceTextGroup, 'text', '', function(s) {
@@ -136,13 +123,15 @@ module.exports = function plot(gd, cdmodule) {
                     s.attr('data-notex', 1);
                 });
 
+                var textPosition = isLeaf ? trace.leaf.textposition : 'inside';
+
                 sliceText.text(pt.text)
                     .attr({
                         'class': 'slicetext',
                         transform: '',
                         'text-anchor': 'middle'
                     })
-                    .call(Drawing.font, textPosition === 'outside' ?
+                    .call(Drawing.font, isRoot || textPosition === 'outside' ?
                       determineOutsideTextFont(trace, pt, gd._fullLayout.font) :
                       determineInsideTextFont(trace, pt, gd._fullLayout.font))
                     .call(svgTextUtils.convertToTspans, gd);
@@ -251,7 +240,7 @@ module.exports = function plot(gd, cdmodule) {
 };
 
 // x[0-1] keys are angles [radians]
-// y[0-1] keys are hierarchy height [integers]
+// y[0-1] keys are hierarchy heights [integers]
 function partition(entry) {
     return d3Hierarchy.partition()
         .size([2 * Math.PI, entry.height + 1])(entry);
@@ -395,6 +384,28 @@ function makeEventData(pt) {
     return pt;
 }
 
+// TODO or call restyle, but would that smoothly transition?
+function attachClickHandlers(slicePath, gd, cd, render) {
+    slicePath.on('click', function(pt) {
+        var clickVal = Events.triggerHandler(gd, 'plotly_sunburstclick', pt);
+        if(clickVal === false) return;
+
+        var fullLayoutNow = gd._fullLayout;
+        if(gd._dragging || fullLayoutNow.hovermode === false) return;
+
+        var hierarchy = cd[0].hierarchy;
+        var id = pt.data.id;
+
+        if(pt.parent) {
+            render(findEntryWithLevel(hierarchy, id));
+            // TODO event data
+        } else {
+            render(findEntryWithChild(hierarchy, id));
+            // TODO event data
+        }
+    });
+}
+
 function determineOutsideTextFont(trace, pt, layoutFont) {
     var ptNumber = pt.data.data.i;
 
@@ -445,7 +456,7 @@ function determineInsideTextFont(trace, pt, layoutFont) {
     };
 }
 
-function getInscribedRadiusFraction(pt, trace) {
+function getInscribedRadiusFraction(pt) {
     if(pt.rpx0 === 0 && pt.xmid === Math.PI) {
         // special case of 100% with no hole
         return 1;

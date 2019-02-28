@@ -109,9 +109,8 @@ exports.calc = function(gd, trace) {
             cd.unshift({
                 implied: true,
                 id: k,
-                label: k,
                 pid: '',
-                parent: ''
+                label: k
             });
         } else {
             return Lib.warn('Multiple implied roots, cannot build sunburst hierarchy.');
@@ -130,9 +129,8 @@ exports.calc = function(gd, trace) {
         cd.unshift({
             implied: true,
             id: dummyId,
-            label: '',
             pid: '',
-            parent: ''
+            label: ''
         });
     }
 

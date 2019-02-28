@@ -767,8 +767,7 @@
     }
   ],
   "layout": {
-    "width": 400,
-    "height": 800,
-    "margin": {"t": 180, "b": 0, "r": 150, "l": 0}
+    "width": 600,
+    "height": 600
   }
 }
