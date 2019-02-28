@@ -90,11 +90,10 @@ module.exports = function plot(gd, cdmodule) {
                 pt.pxmid = rx2px(pt.rpx1, pt.xmid);
                 pt.midangle = -(pt.xmid - Math.PI / 2);
                 pt.halfangle = 0.5 * Math.min(Lib.angleDelta(pt.x0, pt.x1), Math.PI);
-                pt.ring = 1 - (pt.rpx0 / pt.rpx1) - trace.hole;
+                pt.ring = 1 - (pt.rpx0 / pt.rpx1);
                 pt.rInscribed = getInscribedRadiusFraction(pt, trace);
                 quadrants[pt.pxmid[1] < 0 ? 0 : 1][pt.pxmid[0] < 0 ? 0 : 1].push(pt);
 
-                // TODO what to do with hole ?!?
                 slicePath.attr('d', Lib.pathAnnulus(
                     y2rpx(pt.y0), y2rpx(pt.y1),
                     pt.x0, pt.x1,
@@ -447,7 +446,7 @@ function determineInsideTextFont(trace, pt, layoutFont) {
 }
 
 function getInscribedRadiusFraction(pt, trace) {
-    if(pt.rpx0 === 0 && pt.xmid === Math.PI && !trace.hole) {
+    if(pt.rpx0 === 0 && pt.xmid === Math.PI) {
         // special case of 100% with no hole
         return 1;
     } else {

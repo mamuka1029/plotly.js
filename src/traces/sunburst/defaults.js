@@ -38,7 +38,6 @@ module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout
 
     coerce('marker.colors');
 
-    coerce('hole');
     coerce('sort');
     coerce('direction');
     coerce('rotation');

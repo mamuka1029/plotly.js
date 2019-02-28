@@ -155,15 +155,6 @@ module.exports = {
 
     domain: domainAttrs({name: 'sunburst', trace: true, editType: 'calc'}),
 
-    // TODO is this a thing? Combing logic with `root`?
-    hole: extendFlat({}, pieAtts.hole, {
-        // TODO something bigger?
-        dflt: 0,
-        description: [
-            'Sets the fraction of the radius to cut out of the sunburst.'
-        ].join(' ')
-    }),
-
     // TODO Might want the same defaults as for pie traces!!
     // TODO maybe drop for v1 release
     sort: pieAtts.sort,
