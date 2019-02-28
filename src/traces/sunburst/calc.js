@@ -10,12 +10,14 @@
 
 var d3Hierarchy = require('d3-hierarchy');
 var isNumeric = require('fast-isnumeric');
-var tinycolor = require('tinycolor2');
 
 var Lib = require('../../lib');
-var Color = require('../../components/color');
+var makePullColorFn = require('../pie/calc').makePullColorFn;
+var generateExtendedColors = require('../pie/calc').generateExtendedColors;
 
 var isArrayOrTypedArray = Lib.isArrayOrTypedArray;
+
+var sunburstExtendedColorWays = {};
 
 exports.calc = function(gd, trace) {
     var fullLayout = gd._fullLayout;
@@ -35,7 +37,9 @@ exports.calc = function(gd, trace) {
         refs[v] = 1;
     };
 
-    var isValidVal = function(i) { return !hasVals || (isNumeric(vals[i]) && vals[i] >= 0); };
+    var isValidVal = function(i) {
+        return !hasVals || (isNumeric(vals[i]) && vals[i] >= 0);
+    };
 
     var len;
     var isValid;
@@ -165,19 +169,7 @@ exports.calc = function(gd, trace) {
     hierarchy.sort(function(a, b) { return b.value - a.value; });
 
     var colors = trace.marker.colors || [];
-    var colorMap = fullLayout._sunburstcolormap;
-
-    function pullColor(color, id) {
-        if(!color) return false;
-
-        color = tinycolor(color);
-        if(!color.isValid()) return false;
-
-        color = Color.addOpacity(color, color.getAlpha());
-        if(colorMap[id]) colorMap[id] = color;
-
-        return color;
-    }
+    var pullColor = makePullColorFn(fullLayout._sunburstcolormap);
 
     // TODO keep track of 'root-children' (i.e. branch) for hover info etc.
 
@@ -207,7 +199,7 @@ exports.crossTraceCalc = function(gd) {
     var colorMap = fullLayout._sunburstcolormap;
 
     if(fullLayout.extendsunburstcolors) {
-        colorWay = generateExtendedColors(colorWay);
+        colorWay = generateExtendedColors(colorWay, sunburstExtendedColorWays);
     }
     var dfltColorCount = 0;
 
@@ -243,30 +235,3 @@ exports.crossTraceCalc = function(gd) {
         }
     }
 };
-
-/*
- * pick a default color from the main default set, augmented by
- * itself lighter then darker before repeating
- */
-var extendedColorWays = {};
-
-function generateExtendedColors(colorList) {
-    var i;
-    var colorString = JSON.stringify(colorList);
-    var pieColors = extendedColorWays[colorString];
-
-    if(!pieColors) {
-        pieColors = colorList.slice();
-
-        for(i = 0; i < colorList.length; i++) {
-            pieColors.push(tinycolor(colorList[i]).lighten(20).toHexString());
-        }
-
-        for(i = 0; i < colorList.length; i++) {
-            pieColors.push(tinycolor(colorList[i]).darken(20).toHexString());
-        }
-        extendedColorWays[colorString] = pieColors;
-    }
-
-    return pieColors;
-}
