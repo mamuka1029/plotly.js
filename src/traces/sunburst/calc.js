@@ -17,14 +17,19 @@ var Color = require('../../components/color');
 
 var isArrayOrTypedArray = Lib.isArrayOrTypedArray;
 
+function isPositiveNumeric(v) {
+    return isNumeric(v) && v >= 0;
+}
+
 exports.calc = function(gd, trace) {
     var fullLayout = gd._fullLayout;
     var ids = trace.ids;
     var labels = trace.labels;
     var parents = trace.parents;
-    // var values = trace.values;
+    var vals = trace.values;
+    var hasVals = isArrayOrTypedArray(vals);
     var cd = [];
-    var i, len;
+    var i, len, pt;
 
     var parent2children = {};
     var refs = {};
@@ -34,30 +39,34 @@ exports.calc = function(gd, trace) {
         refs[v] = 1;
     };
 
-    // TODO compute vTotal for all rings?
-
     if(isArrayOrTypedArray(ids)) {
         len = Math.min(ids.length, parents.length);
+        if(hasVals) len = Math.min(len, vals.length);
 
         for(i = 0; i < len; i++) {
-            if(ids[i]) {
+            if(ids[i] && (!hasVals || isPositiveNumeric(vals[i]))) {
                 var id = String(ids[i]);
                 var pid = parents[i] ? String(parents[i]) : '';
 
-                cd.push({
+                pt = {
                     i: i,
                     id: id,
                     pid: pid,
-                    label: labels[i] ? String(labels[i]) : ''
-                });
+                    label: labels[i] ? String(labels[i]) : '',
+                };
+
+                if(hasVals) pt.v = +vals[i];
+
+                cd.push(pt);
                 addToLookup(pid, id);
             }
         }
     } else {
         len = Math.min(labels.length, parents.length);
+        if(hasVals) len = Math.min(len, vals.length);
 
         for(i = 0; i < len; i++) {
-            if(labels[i]) {
+            if(labels[i] && (!hasVals || isPositiveNumeric(vals[i]))) {
                 // TODO We could allow some label / parent duplication
                 //
                 // From AJ:
@@ -68,12 +77,16 @@ exports.calc = function(gd, trace) {
                 var label = String(labels[i]);
                 var parent = parents[i] ? String(parents[i]) : '';
 
-                cd.push({
+                pt = {
                     i: i,
                     id: label,
                     pid: parent,
                     label: label
-                });
+                };
+
+                if(hasVals) pt.v = +vals[i];
+
+                cd.push(pt);
                 addToLookup(parent, label);
             }
         }
@@ -132,9 +145,40 @@ exports.calc = function(gd, trace) {
         return Lib.warn('Failed to build sunburst hierarchy.');
     }
 
-    var hierarchy = cd[0].hierarchy = d3Hierarchy.hierarchy(root)
-        .count()
-        .sort(function(a, b) { return b.value - a.value; });
+    var hierarchy = d3Hierarchy.hierarchy(root);
+
+    if(hasVals) {
+        switch(trace.branchvalues) {
+            case 'extra':
+                hierarchy.sum(function(d) { return d.data.v; });
+                break;
+            case 'total':
+                hierarchy.each(function(d) {
+                    var v = d.data.data.v;
+
+                    if(d.children) {
+                        var partialSum = d.children.reduce(function(a, c) {
+                            return a + c.data.data.v;
+                        }, 0);
+                        if(v < partialSum) {
+                            d.value = partialSum;
+                            return Lib.warn([
+                                'Total value for node', d.data.id,
+                                'is smaller than the sum of its childrens\'.'
+                            ].join(' '));
+                        }
+                    }
+
+                    d.value = v;
+                });
+                break;
+        }
+    } else {
+        hierarchy.count();
+    }
+
+    // TODO sort by height also?
+    hierarchy.sort(function(a, b) { return b.value - a.value; });
 
     var colors = trace.marker.colors || [];
     var colorMap = fullLayout._sunburstcolormap;
@@ -161,25 +205,10 @@ exports.calc = function(gd, trace) {
         pt.color = pullColor(colors[pt.i], id);
     });
 
+    cd[0].hierarchy = hierarchy;
+
     return cd;
 };
-
-// Going outward, sectors inherit from their parents.
-// Or if we follow https://bl.ocks.org/mbostock/4348373,
-// only leaves inherit from their parents -
-// sectors with their own children get new default colors.
-// Or perhaps a combination of the two:
-// branches can inherit explicitly provided colors,
-// but only leaves can inherit default colors?
-// That may be too complicated, but it would support a very common color scheme
-// in which each inner sector has a unique color but all its descendants share that color.
-// Or perhaps this inheritance is itself a setting...
-//
-// Going inward, a parent inherits from its children if they all match,
-// otherwise it picks the next default color.
-// This might also be too complicated,
-// but would be useful if it happens to give the right result without adding extra rows
-// for non-leaf nodes.
 
 /*
  * `calc` filled in (and collated) explicit colors.
@@ -199,34 +228,36 @@ exports.crossTraceCalc = function(gd) {
     }
     var dfltColorCount = 0;
 
+    function pickColor(d) {
+        var pt = d.data.data;
+        var id = d.data.id;
+
+        if(pt.color === false) {
+            if(colorMap[id]) {
+                // have we seen this label and assigned a color to it in a previous trace?
+                pt.color = colorMap[id];
+            } else if(d.parent) {
+                if(d.parent.parent) {
+                    // from third-level on, inherit from parent
+                    pt.color = d.parent.data.data.color;
+                } else {
+                    // pick new color for second level
+                    colorMap[id] = pt.color = colorWay[dfltColorCount % colorWay.length];
+                    dfltColorCount++;
+                }
+            } else {
+                // root gets no coloring by default
+                pt.color = 'rgba(0,0,0,0)';
+            }
+        }
+    }
+
     for(var i = 0; i < calcdata.length; i++) {
         var cd = calcdata[i];
         var cd0 = cd[0];
-
-        if(cd0.trace.type !== 'sunburst' || !cd0.hierarchy) continue;
-
-        var done = {};
-
-        cd0.hierarchy.each(function(d) {
-            var pt = d.data.data;
-            var id = d.data.id;
-
-            if(pt.color === false && !done[id]) {
-                // have we seen this label and assigned a color to it in a previous trace?
-                if(colorMap[id]) {
-                    pt.color = colorMap[id];
-                } else if(d.parent) {
-                    if(d.parent.parent) {
-                        pt.color = d.parent.data.data.color;
-                    } else {
-                        colorMap[id] = pt.color = colorWay[dfltColorCount % colorWay.length];
-                        dfltColorCount++;
-                    }
-                }
-
-                done[id] = 1;
-            }
-        });
+        if(cd0.trace.type === 'sunburst' && cd0.hierarchy) {
+            cd0.hierarchy.each(pickColor);
+        }
     }
 };
 

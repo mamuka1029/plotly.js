@@ -27,7 +27,9 @@ module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout
         return;
     }
 
-    coerce('values');
+    var vals = coerce('values');
+    if(vals && vals.length) coerce('branchvalues');
+
     coerce('level');
     coerce('maxdepth');
 

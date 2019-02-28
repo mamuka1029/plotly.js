@@ -40,13 +40,14 @@ module.exports = {
             ''
         ].join(' ')
     },
-    // branchvalues: {
-    //     valType: 'enumerated',
-    //     values: ['total', 'extra'],
-    //     editType: 'calc',
-    //     role: 'info',
-    //     description: ''
-    // },
+    branchvalues: {
+        valType: 'enumerated',
+        values: ['total', 'extra'],
+        dflt: 'extra',
+        editType: 'calc',
+        role: 'info',
+        description: ''
+    },
 
     level: {
         valType: 'any',
