@@ -17,19 +17,15 @@ var Color = require('../../components/color');
 
 var isArrayOrTypedArray = Lib.isArrayOrTypedArray;
 
-function isPositiveNumeric(v) {
-    return isNumeric(v) && v >= 0;
-}
-
 exports.calc = function(gd, trace) {
     var fullLayout = gd._fullLayout;
     var ids = trace.ids;
+    var hasIds = isArrayOrTypedArray(ids);
     var labels = trace.labels;
     var parents = trace.parents;
     var vals = trace.values;
     var hasVals = isArrayOrTypedArray(vals);
     var cd = [];
-    var i, len, pt;
 
     var parent2children = {};
     var refs = {};
@@ -39,56 +35,46 @@ exports.calc = function(gd, trace) {
         refs[v] = 1;
     };
 
-    if(isArrayOrTypedArray(ids)) {
+    var isValidVal = function(i) { return !hasVals || (isNumeric(vals[i]) && vals[i] >= 0); };
+
+    var len;
+    var isValid;
+    var getId;
+
+    if(hasIds) {
         len = Math.min(ids.length, parents.length);
-        if(hasVals) len = Math.min(len, vals.length);
-
-        for(i = 0; i < len; i++) {
-            if(ids[i] && (!hasVals || isPositiveNumeric(vals[i]))) {
-                var id = String(ids[i]);
-                var pid = parents[i] ? String(parents[i]) : '';
-
-                pt = {
-                    i: i,
-                    id: id,
-                    pid: pid,
-                    label: labels[i] ? String(labels[i]) : '',
-                };
-
-                if(hasVals) pt.v = +vals[i];
-
-                cd.push(pt);
-                addToLookup(pid, id);
-            }
-        }
+        isValid = function(i) { return ids[i] && isValidVal(i); };
+        getId = function(i) { return String(ids[i]); };
     } else {
         len = Math.min(labels.length, parents.length);
-        if(hasVals) len = Math.min(len, vals.length);
+        isValid = function(i) { return labels[i] && isValidVal(i); };
+        // TODO We could allow some label / parent duplication
+        //
+        // From AJ:
+        //  It would work OK for one level
+        //  (multiple rows with the same name and different parents -
+        //  or even the same parent) but if that name is then used as a parent
+        //  which one is it?
+        getId = function(i) { return String(labels[i]); };
+    }
 
-        for(i = 0; i < len; i++) {
-            if(labels[i] && (!hasVals || isPositiveNumeric(vals[i]))) {
-                // TODO We could allow some label / parent duplication
-                //
-                // From AJ:
-                //  It would work OK for one level
-                //  (multiple rows with the same name and different parents -
-                //  or even the same parent) but if that name is then used as a parent
-                //  which one is it?
-                var label = String(labels[i]);
-                var parent = parents[i] ? String(parents[i]) : '';
+    if(hasVals) len = Math.min(len, vals.length);
 
-                pt = {
-                    i: i,
-                    id: label,
-                    pid: parent,
-                    label: label
-                };
+    for(var i = 0; i < len; i++) {
+        if(isValid(i)) {
+            var id = getId(i);
+            var pid = parents[i] ? String(parents[i]) : '';
 
-                if(hasVals) pt.v = +vals[i];
+            var pt = {
+                i: i,
+                id: id,
+                pid: pid,
+                label: labels[i] ? String(labels[i]) : ''
+            };
 
-                cd.push(pt);
-                addToLookup(parent, label);
-            }
+            if(hasVals) pt.v = +vals[i];
+            cd.push(pt);
+            addToLookup(pid, id);
         }
     }
 
@@ -107,7 +93,6 @@ exports.calc = function(gd, trace) {
         if(impliedRoots.length === 1) {
             k = impliedRoots[0];
             cd.unshift({
-                implied: true,
                 id: k,
                 pid: '',
                 label: k
@@ -121,13 +106,14 @@ exports.calc = function(gd, trace) {
         // if multiple rows linked to the root node,
         // add dummy "root of roots" node to make d3 build the hierarchy successfully
 
-        for(i = 0; i < cd.length; i++) {
-            if(cd[i].parent === '') cd[i].parent = dummyId;
-            if(cd[i].pid === '') cd[i].pid = dummyId;
+        for(var j = 0; j < cd.length; j++) {
+            if(cd[j].parent === '') cd[j].parent = dummyId;
+            if(cd[j].pid === '') cd[j].pid = dummyId;
         }
 
         cd.unshift({
-            implied: true,
+            // TODO handler in plot!!
+            rootOfRoots: true,
             id: dummyId,
             pid: '',
             label: ''
@@ -198,7 +184,6 @@ exports.calc = function(gd, trace) {
     hierarchy.each(function(d) {
         var pt = d.data.data;
         var id = d.data.id;
-
         // N.B. this mutates items in `cd`
         pt.color = pullColor(colors[pt.i], id);
     });
