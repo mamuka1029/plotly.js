@@ -83,8 +83,6 @@ function plot(gd, cdpie) {
                 pt.cxFinal = cx;
                 pt.cyFinal = cy;
 
-                // TODO reuse lib/angle.js methods !!!
-
                 function arc(start, finish, cw, scale) {
                     return 'a' + (scale * cd0.r) + ',' + (scale * cd0.r) + ' 0 ' +
                         pt.largeArc + (cw ? ' 1 ' : ' 0 ') +

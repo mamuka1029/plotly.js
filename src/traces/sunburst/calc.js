@@ -116,7 +116,6 @@ exports.calc = function(gd, trace) {
         }
 
         cd.unshift({
-            // TODO handler in plot!!
             rootOfRoots: true,
             id: dummyId,
             pid: '',
@@ -124,6 +123,7 @@ exports.calc = function(gd, trace) {
         });
     }
 
+    // TODO might be better to replace stratify() with our own algorithm
     var root;
     try {
         root = d3Hierarchy.stratify()
