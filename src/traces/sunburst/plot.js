@@ -19,20 +19,18 @@ var Events = require('../../lib/events');
 var svgTextUtils = require('../../lib/svg_text_utils');
 var setCursor = require('../../lib/setcursor');
 
+var transformInsideText = require('../pie/plot').transformInsideText;
+var transformOutsideText = require('../pie/plot').transformOutsideText;
+var scootLabels = require('../pie/plot').scootLabels;
+var plotTextLines = require('../pie/plot').plotTextLines;
 var styleOne = require('./style').styleOne;
-
-/**
- * See
- * - https://beta.observablehq.com/@mbostock/d3-zoomable-sunburst
- * - https://www.anychart.com/products/anychart/gallery/Sunburst_Charts/Coffee_Flavour_Wheel.php
- * - https://github.com/d3/d3-hierarchy
- * - https://github.com/plotly/dash-sunburst/blob/master/src/lib/d3/sunburst.js
- */
 
 module.exports = function plot(gd, cdmodule) {
     var fullLayout = gd._fullLayout;
     var layer = fullLayout._sunburstlayer;
     var gs = fullLayout._size;
+
+    // TODO add 'stroke-linejoin': 'round' or 'stroke-miterlimit' ???
 
     Lib.makeTraceGroups(layer, cdmodule, 'trace').each(function(cd) {
         var gTrace = d3.select(this);
@@ -140,7 +138,6 @@ module.exports = function plot(gd, cdmodule) {
                 var textBB = Drawing.bBox(sliceText.node());
                 var transform;
 
-                // TODO DRY up with pie
                 if(textPosition === 'outside') {
                     transform = transformOutsideText(textBB, pt);
                 } else {
@@ -186,53 +183,7 @@ module.exports = function plot(gd, cdmodule) {
                 scootLabels(quadrants, trace);
             }
 
-            // DRY up with Pie.plot !!
-            slices.each(function(pt) {
-                if(pt.labelExtraX || pt.labelExtraY) {
-                    // first move the text to its new location
-                    var sliceTop = d3.select(this);
-                    var sliceText = sliceTop.select('g.slicetext text');
-
-                    sliceText.attr('transform',
-                        'translate(' + pt.labelExtraX + ',' + pt.labelExtraY + ')' +
-                        sliceText.attr('transform'));
-
-                    // then add a line to the new location
-                    var lineStartX = cx + pt.pxmid[0];
-                    var lineStartY = cy + pt.pxmid[1];
-                    var textLinePath = 'M' + lineStartX + ',' + lineStartY;
-                    var finalX = (pt.yLabelMax - pt.yLabelMin) * (pt.pxmid[0] < 0 ? -1 : 1) / 4;
-
-                    if(pt.labelExtraX) {
-                        var yFromX = pt.labelExtraX * pt.pxmid[1] / pt.pxmid[0];
-                        var yNet = pt.yLabelMid + pt.labelExtraY - (cy + pt.pxmid[1]);
-
-                        if(Math.abs(yFromX) > Math.abs(yNet)) {
-                            textLinePath +=
-                                'l' + (yNet * pt.pxmid[0] / pt.pxmid[1]) + ',' + yNet +
-                                'H' + (lineStartX + pt.labelExtraX + finalX);
-                        } else {
-                            textLinePath += 'l' + pt.labelExtraX + ',' + yFromX +
-                                'v' + (yNet - yFromX) +
-                                'h' + finalX;
-                        }
-                    } else {
-                        textLinePath +=
-                            'V' + (pt.yLabelMid + pt.labelExtraY) +
-                            'h' + finalX;
-                    }
-
-                    Lib.ensureSingle(sliceTop, 'path', 'textline')
-                        .call(Color.stroke, trace.outsidetextfont.color)
-                        .attr({
-                            'stroke-width': Math.min(2, trace.outsidetextfont.size / 8),
-                            d: textLinePath,
-                            fill: 'none'
-                        });
-                } else {
-                    d3.select(this).select('path.textline').remove();
-                }
-            });
+            plotTextLines(slices, trace);
         }
 
         render(findEntryWithLevel(hierarchy, trace.level));
@@ -273,6 +224,8 @@ function findEntryWithChild(hierarchy, childId) {
     });
     return out || hierarchy;
 }
+
+// TODO shouldn't this be sliceTop ??????????
 
 function attachHoverHandlers(slicePath, gd, cd) {
     var cd0 = cd[0];
@@ -465,192 +418,5 @@ function getInscribedRadiusFraction(pt) {
             1 / (1 + 1 / Math.sin(pt.halfangle)),
             pt.ring / 2
         ));
-    }
-}
-
-// TODO reuse from Pie.plot
-function transformInsideText(textBB, pt) {
-    var textDiameter = Math.sqrt(textBB.width * textBB.width + textBB.height * textBB.height);
-    var textAspect = textBB.width / textBB.height;
-    var halfAngle = pt.halfangle;
-    var ring = pt.ring;
-    var rInscribed = pt.rInscribed;
-
-    // max size text can be inserted inside without rotating it
-    // this inscribes the text rectangle in a circle, which is then inscribed
-    // in the slice, so it will be an underestimate, which some day we may want
-    // to improve so this case can get more use
-    var transform = {
-        scale: rInscribed * pt.rpx1 * 2 / textDiameter,
-
-        // and the center position and rotation in this case
-        rCenter: 1 - rInscribed,
-        rotate: 0
-    };
-
-    if(transform.scale >= 1) return transform;
-
-    // max size if text is rotated radially
-    var Qr = textAspect + 1 / (2 * Math.tan(halfAngle));
-    var maxHalfHeightRotRadial = pt.rpx1 * Math.min(
-        1 / (Math.sqrt(Qr * Qr + 0.5) + Qr),
-        ring / (Math.sqrt(textAspect * textAspect + ring / 2) + textAspect)
-    );
-    var radialTransform = {
-        scale: maxHalfHeightRotRadial * 2 / textBB.height,
-        rCenter: Math.cos(maxHalfHeightRotRadial / pt.rpx1) -
-            maxHalfHeightRotRadial * textAspect / pt.rpx1,
-        rotate: (180 / Math.PI * pt.midangle + 720) % 180 - 90
-    };
-
-    // max size if text is rotated tangentially
-    var aspectInv = 1 / textAspect;
-    var Qt = aspectInv + 1 / (2 * Math.tan(halfAngle));
-    var maxHalfWidthTangential = pt.rpx1 * Math.min(
-        1 / (Math.sqrt(Qt * Qt + 0.5) + Qt),
-        ring / (Math.sqrt(aspectInv * aspectInv + ring / 2) + aspectInv)
-    );
-    var tangentialTransform = {
-        scale: maxHalfWidthTangential * 2 / textBB.width,
-        rCenter: Math.cos(maxHalfWidthTangential / pt.rpx1) -
-            maxHalfWidthTangential / textAspect / pt.rpx1,
-        rotate: (180 / Math.PI * pt.midangle + 810) % 180 - 90
-    };
-
-    // if we need a rotated transform, pick the biggest one
-    // even if both are bigger than 1
-    var rotatedTransform = tangentialTransform.scale > radialTransform.scale ?
-        tangentialTransform :
-        radialTransform;
-
-    return (transform.scale < 1 && rotatedTransform.scale > transform.scale) ?
-        rotatedTransform :
-        transform;
-}
-
-// TODO reuse from Pie.plot
-function transformOutsideText(textBB, pt) {
-    var x = pt.pxmid[0];
-    var y = pt.pxmid[1];
-    var dx = textBB.width / 2;
-    var dy = textBB.height / 2;
-
-    if(x < 0) dx *= -1;
-    if(y < 0) dy *= -1;
-
-    return {
-        scale: 1,
-        rCenter: 1,
-        rotate: 0,
-        x: dx + Math.abs(dy) * (dx > 0 ? 1 : -1) / 2,
-        y: dy / (1 + x * x / (y * y)),
-        outside: true
-    };
-}
-
-// TODO reuse from Pie.plot
-function scootLabels(quadrants, trace) {
-    var xHalf, yHalf, equatorFirst, farthestX, farthestY,
-        xDiffSign, yDiffSign, thisQuad, oppositeQuad,
-        wholeSide, i, thisQuadOutside, firstOppositeOutsidePt;
-
-    function topFirst(a, b) { return a.pxmid[1] - b.pxmid[1]; }
-    function bottomFirst(a, b) { return b.pxmid[1] - a.pxmid[1]; }
-
-    function scootOneLabel(thisPt, prevPt) {
-        if(!prevPt) prevPt = {};
-
-        var prevOuterY = prevPt.labelExtraY + (yHalf ? prevPt.yLabelMax : prevPt.yLabelMin);
-        var thisInnerY = yHalf ? thisPt.yLabelMin : thisPt.yLabelMax;
-        var thisOuterY = yHalf ? thisPt.yLabelMax : thisPt.yLabelMin;
-        var thisSliceOuterY = thisPt.cyFinal + farthestY(thisPt.px0[1], thisPt.px1[1]);
-        var newExtraY = prevOuterY - thisInnerY;
-
-        var xBuffer, i, otherPt, otherOuterY, otherOuterX, newExtraX;
-
-        // make sure this label doesn't overlap other labels
-        // this *only* has us move these labels vertically
-        if(newExtraY * yDiffSign > 0) thisPt.labelExtraY = newExtraY;
-
-        // make sure this label doesn't overlap any slices
-        if(!Array.isArray(trace.pull)) return; // this can only happen with array pulls
-
-        for(i = 0; i < wholeSide.length; i++) {
-            otherPt = wholeSide[i];
-
-            // overlap can only happen if the other point is pulled more than this one
-            if(otherPt === thisPt || (
-                (helpers.castOption(trace.pull, thisPt.pts) || 0) >=
-                (helpers.castOption(trace.pull, otherPt.pts) || 0))
-            ) {
-                continue;
-            }
-
-            if((thisPt.pxmid[1] - otherPt.pxmid[1]) * yDiffSign > 0) {
-                // closer to the equator - by construction all of these happen first
-                // move the text vertically to get away from these slices
-                otherOuterY = otherPt.cyFinal + farthestY(otherPt.px0[1], otherPt.px1[1]);
-                newExtraY = otherOuterY - thisInnerY - thisPt.labelExtraY;
-
-                if(newExtraY * yDiffSign > 0) thisPt.labelExtraY += newExtraY;
-
-            } else if((thisOuterY + thisPt.labelExtraY - thisSliceOuterY) * yDiffSign > 0) {
-                // farther from the equator - happens after we've done all the
-                // vertical moving we're going to do
-                // move horizontally to get away from these more polar slices
-
-                // if we're moving horz. based on a slice that's several slices away from this one
-                // then we need some extra space for the lines to labels between them
-                xBuffer = 3 * xDiffSign * Math.abs(i - wholeSide.indexOf(thisPt));
-
-                otherOuterX = otherPt.cxFinal + farthestX(otherPt.px0[0], otherPt.px1[0]);
-                newExtraX = otherOuterX + xBuffer - (thisPt.cxFinal + thisPt.pxmid[0]) - thisPt.labelExtraX;
-
-                if(newExtraX * xDiffSign > 0) thisPt.labelExtraX += newExtraX;
-            }
-        }
-    }
-
-    for(yHalf = 0; yHalf < 2; yHalf++) {
-        equatorFirst = yHalf ? topFirst : bottomFirst;
-        farthestY = yHalf ? Math.max : Math.min;
-        yDiffSign = yHalf ? 1 : -1;
-
-        for(xHalf = 0; xHalf < 2; xHalf++) {
-            farthestX = xHalf ? Math.max : Math.min;
-            xDiffSign = xHalf ? 1 : -1;
-
-            // first sort the array
-            // note this is a copy of cd, so cd itself doesn't get sorted
-            // but we can still modify points in place.
-            thisQuad = quadrants[yHalf][xHalf];
-            thisQuad.sort(equatorFirst);
-
-            oppositeQuad = quadrants[1 - yHalf][xHalf];
-            wholeSide = oppositeQuad.concat(thisQuad);
-
-            thisQuadOutside = [];
-            for(i = 0; i < thisQuad.length; i++) {
-                if(thisQuad[i].yLabelMid !== undefined) thisQuadOutside.push(thisQuad[i]);
-            }
-
-            firstOppositeOutsidePt = false;
-            for(i = 0; yHalf && i < oppositeQuad.length; i++) {
-                if(oppositeQuad[i].yLabelMid !== undefined) {
-                    firstOppositeOutsidePt = oppositeQuad[i];
-                    break;
-                }
-            }
-
-            // each needs to avoid the previous
-            for(i = 0; i < thisQuadOutside.length; i++) {
-                var prevPt = i && thisQuadOutside[i - 1];
-                // bottom half needs to avoid the first label of the top half
-                // top half we still need to call scootOneLabel on the first slice
-                // so we can avoid other slices, but we don't pass a prevPt
-                if(firstOppositeOutsidePt && !i) prevPt = firstOppositeOutsidePt;
-                scootOneLabel(thisQuadOutside[i], prevPt);
-            }
-        }
     }
 }
