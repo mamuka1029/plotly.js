@@ -12,23 +12,24 @@ var Lib = require('../../lib');
 var attributes = require('./attributes');
 var handleDomainDefaults = require('../../plots/domain').defaults;
 
-var coerceFont = Lib.coerceFont;
-
-function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
+module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
     function coerce(attr, dflt) {
         return Lib.coerce(traceIn, traceOut, attributes, attr, dflt);
     }
 
+    var coerceFont = Lib.coerceFont;
     var len;
+
     var vals = coerce('values');
     var hasVals = Lib.isArrayOrTypedArray(vals);
     var labels = coerce('labels');
-
     if(Array.isArray(labels)) {
         len = labels.length;
         if(hasVals) len = Math.min(len, vals.length);
-    } else if(hasVals) {
+    }
+    else if(hasVals) {
         len = vals.length;
+
         coerce('label0');
         coerce('dlabel');
     }
@@ -47,18 +48,6 @@ function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
     coerce('scalegroup');
     // TODO: hole needs to be coerced to the same value within a scaleegroup
 
-    coerce('hole');
-    coerce('sort');
-    coerce('direction');
-    coerce('rotation');
-    coerce('pull');
-
-    handleDomainDefaults(traceOut, layout, coerce);
-    handleTextDefaults(traceIn, traceOut, coerce, layout);
-    handleTitleDefaults(traceIn, traceOut, coerce, layout);
-}
-
-function handleTextDefaults(traceIn, traceOut, coerce, layout) {
     var textData = coerce('text');
     var textInfo = coerce('textinfo', Array.isArray(textData) ? 'text+percent' : 'percent');
     coerce('hovertext');
@@ -84,20 +73,20 @@ function handleTextDefaults(traceIn, traceOut, coerce, layout) {
             if(hasOutside) coerceFont(coerce, 'outsidetextfont', dfltFont);
         }
     }
-}
 
-function handleTitleDefaults(traceIn, traceOut, coerce, layout) {
+    handleDomainDefaults(traceOut, layout, coerce);
+
+    var hole = coerce('hole');
     var title = coerce('title.text');
     if(title) {
-        var hole = traceOut.hole;
-        var tp = coerce('title.position', hole ? 'middle center' : 'top center');
-        if(!hole && tp === 'middle center') traceOut.title.position = 'top center';
+        var titlePosition = coerce('title.position', hole ? 'middle center' : 'top center');
+        if(!hole && titlePosition === 'middle center') traceOut.title.position = 'top center';
         coerceFont(coerce, 'title.font', layout.font);
     }
-}
 
-module.exports = {
-    supplyDefaults: supplyDefaults,
-    handleTextDefaults: handleTextDefaults,
-    handleTitleDefaults: handleTitleDefaults
+    coerce('sort');
+    coerce('direction');
+    coerce('rotation');
+
+    coerce('pull');
 };
